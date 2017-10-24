@@ -24,19 +24,39 @@ enum fg_color2        = createColor(240 - 120, 235 - 120, 220 - 120);
 enum fg_color3        = createColor(100, 100, 100);
 enum text_shade_color = createColor(11, 11, 11);
 
-
 void main(string[] args) {
 
-    enum refreshRate     = 1000;
+    void printHelp() {
+        writeln("Simple timer to execute a provided command.");
+        writeln("Usage:");
+        writeln("d-timer [command to execute] [ command arguments]");
+        writeln("Example:");
+        writeln("d-timer aplay beep.au");
+    }
 
-    auto window = new SimpleWindow(512, 96, "d-timer", OpenGlOptions.no, Resizability.fixedSize);
+    if (args.length == 1) {
+        writeln("Error: Too few arguments.");
+        writeln();
+        printHelp();
+        return;
+    }
+
+    const cmdWithArgs = args[1 .. $];
+    writeln("Executing: ", cmdWithArgs, " after countdown.");
+
+    immutable APP_NAME = args[1];
+
+    enum refreshRate     = 1000;
+    int countdown        = 2 * 60 * 60;
+    //undecorated
+    auto window = new SimpleWindow(512, 96, "d-timer: " ~ cmdWithArgs[0], OpenGlOptions.no, Resizability.fixedSize /*, WindowTypes.undecorated*/ );
 
     auto screenWidth = DisplayWidth(XDisplayConnection.get(), 0);
     auto screenHeight = DisplayHeight(XDisplayConnection.get(), 0);
 
-    Slider slider = Slider(0, 100);
-    slider.area = Rectangle(Point(10, 40), Size(window.width - 20, 32));
-    slider.value = 50;
+    Slider slider = Slider(60, 4 * 60 * 60, 60); // 1m - 4h
+    slider.area = Rectangle(Point(30, 40), Size(window.width - 60, 32));
+    slider.value = countdown;
 
     void redraw() {
         if (window.closed) return;
@@ -65,42 +85,59 @@ void main(string[] args) {
         immutable oy = 16;
 
         slider.render(painter);
+        slider.onValueChanged = delegate(ref Slider s, float val) { countdown = cast(int) val; return true; };
 
-
-        {
-            immutable str = format("%.3f", slider.value);
-
-            //painter.outlineColor = text_shade_color;
-            //painter.drawText(Point(1 + ox, 1 + oy), str, Point(window.width + 1, window.height + 1), TextAlignment.Center);
-
-            painter.outlineColor = fg_color;
-            painter.drawText(Point(ox, oy), str, Point(window.width, window.height), TextAlignment.Center);
-        }
-
-        /+
-        {
-            immutable str = format("%02d %s %s", now.day, now.month, now.year);
+        void drawText(string str, int x, int y, int w, int h, Color color, TextAlignment ta = TextAlignment.Left) {
 
             painter.outlineColor = text_shade_color;
-            painter.drawText(Point(1 + ox, 1 + oy + 16), str, Point(window.width + 1, window.height + 1 + 16), TextAlignment.Center);
+            painter.drawText(Point(x + 1, y + 1), str, Point(w + 1, h + 1), ta);
 
-            painter.outlineColor = fg_color2;
-            painter.drawText(Point(ox, oy + 16), str, Point(window.width, window.height + 16), TextAlignment.Center);
+            painter.outlineColor = color;
+            painter.drawText(Point(x, y), str, Point(w, h), ta);
         }
-        +/
+
+        {
+            int seconds = countdown;
+            int mins    = cast(int)(seconds / 60);
+
+            string str;
+
+            if (mins >= 60) {
+                int h = cast(int)(mins / 60);
+                mins -= 60 * h;
+
+                if (h > 1) {
+                    str = format("%s hours %s minutes", h, mins);
+                }
+                else {
+                    str = format("%s hour %s minutes", h, mins);
+                }
+            }
+            else if (mins > 1) {
+                str = format("%s minutes", mins);
+            }
+            else {
+                str = format("%s seconds", seconds);
+            }
+
+            drawText(str, ox, oy, window.width, window.height, fg_color, TextAlignment.Center);
+        }
+
+        drawText("Press [ESC] to cancel.", ox, window.height - 18, window.width - 8, window.height, fg_color3, TextAlignment.Right);
+
     }
 
     redraw();
     window.eventLoop(refreshRate, delegate() {
         //
 
-        if (!slider.isActive && slider.value > 0) slider.value = slider.value - refreshRate / 1000.0;
+        //if (!slider.isActive && slider.value > 0) slider.value = slider.value - refreshRate / 1000.0;
+        countdown -= refreshRate / 1000.0;
+        if (countdown >= slider.min && !slider.isActive) slider.value = countdown;
 
-        if (slider.value <= 0) {
-
+        if (countdown <= 0) {
             window.close();
         }
-
 
         redraw();
     }, delegate(KeyEvent ev) {
@@ -110,17 +147,47 @@ void main(string[] args) {
         }
 
     }, delegate(MouseEvent ev) {
-        //
+
+        // TODO: Redraw only if needed.
+
         auto mouseDown = (ev.type == MouseEventType.motion && (ev.modifierState & ModifierState.leftButtonDown));
         slider.update(Point(ev.x, ev.y), mouseDown);
+
+        // FIXME
+        if (ev.type == MouseEventType.buttonPressed) {
+            enum wheelGain = 5 * 60;
+
+            int t = countdown - (countdown % wheelGain);
+
+            if (ev.button == MouseButton.wheelUp) {
+                if (t + wheelGain< slider.max) {
+                    countdown = t + wheelGain;
+                }
+                else {
+                    countdown = cast(int)(slider.max);
+                }
+                slider.value = countdown;
+            }
+            if (ev.button == MouseButton.wheelDown) {
+                if (t - wheelGain > slider.min) {
+                    countdown = t - wheelGain;
+                }
+                else {
+                    countdown = cast(int)(slider.min);
+                }
+
+                slider.value = countdown;
+            }
+        }
+
         redraw();
     });
 
-
-
-    //auto prcs = execute(["systemctl", "suspend"]);
-    //auto lines = lineSplitter(prcs.output);
-    //writeln(lines);
-
+    // If closed by countdown.
+    if (countdown <= 0) {
+        auto prcs = execute(cmdWithArgs);
+        auto lines = lineSplitter(prcs.output);
+        writeln(lines);
+    }
 
 }

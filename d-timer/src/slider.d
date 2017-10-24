@@ -31,6 +31,8 @@ struct Slider {
 
     float _gripSize;
 
+    bool delegate(ref Slider, float) onValueChanged;
+
     @property {
         auto value() {
             return _value;
@@ -89,50 +91,64 @@ struct Slider {
             float frac = ((mousePos.x) - area.left) / cast(float) area.width;
             new_value = min + frac * (max - min);
 
-            if (new_value < min) new_value = min;
-            if (new_value > max) new_value = max;
+            new_value = new_value.clamp(min, max);
 
-            if (_value != new_value) {
-                _value = new_value;
-                has_changed = true;
+            if (step > 0 && new_value != min) {
+                auto delta = (new_value - _value);
+                if (abs(delta) >= step) {
+                    _value += step * cast(int)(delta / step);
+                }
+
+                has_changed = (abs(delta) >= step);
+            }
+            else {
+                if (_value != new_value) {
+                    _value = new_value;
+                    has_changed = true;
+                }
             }
 
         }
         else {
             dragInProgress = false;
         }
+
+        if (has_changed) {
+            if (onValueChanged) onValueChanged(this, _value);
+        }
     }
-
-
 
     void render(ref ScreenPainter painter) {
 
         enum c0 = Color(75, 75, 0);
         enum c1 = Color(215, 215, 0);
+        enum shade = Color(33, 33, 33);
 
-        float slider_half_w = 10;
+        int slider_half_w = 8;
 
-        float frac = (value - min) / (max - min);
-        float slider_pos_x = area.left + area.width * frac;
+        float frac       = (value - min) / (max - min);
+        int slider_pos_x = cast(int)(area.left + area.width * frac);
 
-        // Draw grip
         painter.outlineColor = Color.transparent;
         painter.fillColor = Color.transparent;
 
-
-
+        // Slider
         {
-
             int w = cast(int)(area.width * frac);
             int h = 8;
 
-            int x = area.upperLeft.x + cast(int)(slider_half_w);
+            if (w < 2) w = 2;
+
+            int x = area.upperLeft.x;
             int y = area.upperLeft.y + (area.height - h) / 2;
+
+            // draw shade
+            //painter.fillColor = shade;
+            //painter.drawRectangle(Point(x, y + 1), area.width, h);
 
             // Draw rest
             painter.fillColor = c0;
-            painter.outlineColor = Color.transparent;
-            painter.drawRectangle(Point(x, y), area.width - cast(int)(slider_half_w), h);
+            painter.drawRectangle(Point(x, y), area.width, h);
 
             // Draw value
             painter.fillColor = c1;
@@ -142,15 +158,18 @@ struct Slider {
         // Knob
         {
             painter.fillColor = c1;
-            painter.outlineColor = Color.transparent;
 
-            int w = cast(int)(slider_half_w * 2.0);
-            int h = cast(int)(slider_half_w * 2.0);
+            int w = slider_half_w * 2;
+            int h = slider_half_w * 2;
 
-            int x = area.upperLeft.x + cast(int)(slider_pos_x - slider_half_w);
+            int x = slider_pos_x - slider_half_w;
             int y = area.upperLeft.y + (area.height - h) / 2;
-            //int w = cast(int)(2 * slider_half_w);
 
+            // draw shade
+            //painter.fillColor = shade;
+            //painter.drawRectangle(Point(x, y + 1), w, h);
+
+            painter.fillColor = c1;
             painter.drawRectangle(Point(x, y), w, h);
         }
 
