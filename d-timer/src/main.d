@@ -49,10 +49,10 @@ void main(string[] args) {
     enum refreshRate     = 1000;
     int countdown        = 2 * 60 * 60;
     //undecorated
-    auto window = new SimpleWindow(512, 96, "d-timer: " ~ cmdWithArgs[0], OpenGlOptions.no, Resizability.fixedSize /*, WindowTypes.undecorated*/ );
+    auto window = new SimpleWindow(512, 96, "d-timer: " ~ cmdWithArgs[0], OpenGlOptions.no, Resizability.fixedSize , WindowTypes.undecorated );
 
-    auto screenWidth = DisplayWidth(XDisplayConnection.get(), 0);
-    auto screenHeight = DisplayHeight(XDisplayConnection.get(), 0);
+    //auto screenWidth = DisplayWidth(XDisplayConnection.get(), 0);
+    //auto screenHeight = DisplayHeight(XDisplayConnection.get(), 0);
 
     Slider slider = Slider(60, 4 * 60 * 60, 60); // 1m - 4h
     slider.area = Rectangle(Point(30, 40), Size(window.width - 60, 32));
