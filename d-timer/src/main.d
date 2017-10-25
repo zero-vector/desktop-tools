@@ -1,14 +1,9 @@
 import std.stdio;
 import std.process;
 import std.algorithm;
-
-import arsd.simpledisplay;
 import std.string;
-
-//import std.file;
-import std.algorithm.comparison;
-import std.algorithm.searching;
-
+import std.getopt;
+import arsd.simpledisplay;
 import slider;
 
 pure nothrow Color createColor(ubyte r, ubyte g, ubyte b, ubyte a = 255) {
@@ -25,13 +20,27 @@ enum fg_color3        = createColor(100, 100, 100);
 enum text_shade_color = createColor(11, 11, 11);
 
 void main(string[] args) {
+    //immutable APP_NAME = args[0];
+
+    string messageFormat = "%s";
 
     void printHelp() {
         writeln("Simple timer to execute a provided command.");
         writeln("Usage:");
-        writeln("d-timer [command to execute] [ command arguments]");
+        writeln("d-timer [<option>...] <command> [<arg>]");
+        writeln();
+
+        writeln("Where:");
+        writeln("  <command>      Command to execute.");
+        writeln("  <arg>          Argument(s) of command.");
+        writeln();
+
+        writeln("<option>:");
+        writeln("  -m             Message to display, use one %s place the coundown value.");
+        writeln("  -c             Initial countdown in seconds.");
+
         writeln("Example:");
-        writeln("d-timer aplay beep.au");
+        writeln("  d-timer -m 'In %s i will beep.' aplay beep.au");
     }
 
     if (args.length == 1) {
@@ -41,15 +50,35 @@ void main(string[] args) {
         return;
     }
 
+    enum refreshRate     = 1000;
+    int countdown        = 2 * 60 * 60;
+    auto gres = getopt(args, std.getopt.config.passThrough, "message|m", &messageFormat, "countdown|c", &countdown);
+
+    if (gres.helpWanted) {
+        printHelp();
+        return;
+    }
+
+    if (messageFormat.indexOf("%s") < 0) {
+        writeln(messageFormat);
+        writeln("Bad format of message text, must contain one %s.");
+        return;
+    }
+
+    if (args.length == 1) {
+        writeln("Missing command.");
+        return;
+    }
+
     const cmdWithArgs = args[1 .. $];
     writeln("Executing: ", cmdWithArgs, " after countdown.");
 
-    immutable APP_NAME = args[1];
 
-    enum refreshRate     = 1000;
-    int countdown        = 2 * 60 * 60;
+
+
+
     //undecorated
-    auto window = new SimpleWindow(512, 96, "d-timer: " ~ cmdWithArgs[0], OpenGlOptions.no, Resizability.fixedSize , WindowTypes.undecorated );
+    auto window = new SimpleWindow(512, 96, "d-timer: " ~ cmdWithArgs[0], OpenGlOptions.no, Resizability.fixedSize, WindowTypes.undecorated);
 
     //auto screenWidth = DisplayWidth(XDisplayConnection.get(), 0);
     //auto screenHeight = DisplayHeight(XDisplayConnection.get(), 0);
@@ -120,6 +149,14 @@ void main(string[] args) {
                 str = format("%s seconds", seconds);
             }
 
+            // TODO: Make the format more robust.
+            try {
+                str = format(messageFormat, str);
+            }
+            catch (Exception ex) {
+                // hmmm?
+            }
+
             drawText(str, ox, oy, window.width, window.height, fg_color, TextAlignment.Center);
         }
 
@@ -160,7 +197,7 @@ void main(string[] args) {
             int t = countdown - (countdown % wheelGain);
 
             if (ev.button == MouseButton.wheelUp) {
-                if (t + wheelGain< slider.max) {
+                if (t + wheelGain < slider.max) {
                     countdown = t + wheelGain;
                 }
                 else {
