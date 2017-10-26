@@ -23,6 +23,9 @@ void main(string[] args) {
     //immutable APP_NAME = args[0];
 
     string messageFormat = "%s";
+    enum refreshRate     = 1000;
+    int countdown        = 2 * 60 * 60;
+    bool borderless      = false;
 
     void printHelp() {
         writeln("Simple timer to execute a provided command.");
@@ -38,6 +41,7 @@ void main(string[] args) {
         writeln("<option>:");
         writeln("  -m             Message to display, use one %s place the coundown value.");
         writeln("  -c             Initial countdown in seconds.");
+        writeln("  -b             Borderless window.");
 
         writeln("Example:");
         writeln("  d-timer -m 'In %s i will beep.' aplay beep.au");
@@ -50,14 +54,22 @@ void main(string[] args) {
         return;
     }
 
-    enum refreshRate     = 1000;
-    int countdown        = 2 * 60 * 60;
-    auto gres = getopt(args, std.getopt.config.passThrough, "message|m", &messageFormat, "countdown|c", &countdown);
 
-    if (gres.helpWanted) {
+    try {
+        auto gres = getopt(args, std.getopt.config.passThrough, "message|m", &messageFormat, "countdown|c", &countdown, "borderless|b", &borderless);
+
+        if (gres.helpWanted) {
+            printHelp();
+            return;
+        }
+    }
+    catch (Exception ex) {
+        writeln("Error: ", ex.msg);
+        writeln();
         printHelp();
         return;
     }
+
 
     if (messageFormat.indexOf("%s") < 0) {
         writeln(messageFormat);
@@ -74,14 +86,9 @@ void main(string[] args) {
     writeln("Executing: ", cmdWithArgs, " after countdown.");
 
 
-
-
-
     //undecorated
-    auto window = new SimpleWindow(512, 96, "d-timer: " ~ cmdWithArgs[0], OpenGlOptions.no, Resizability.fixedSize, WindowTypes.undecorated);
+    auto window = new SimpleWindow(512, 96, "d-timer: " ~ cmdWithArgs[0], OpenGlOptions.no, Resizability.fixedSize, ((borderless) ? WindowTypes.undecorated : WindowTypes.normal));
 
-    //auto screenWidth = DisplayWidth(XDisplayConnection.get(), 0);
-    //auto screenHeight = DisplayHeight(XDisplayConnection.get(), 0);
 
     Slider slider = Slider(60, 4 * 60 * 60, 60); // 1m - 4h
     slider.area = Rectangle(Point(30, 40), Size(window.width - 60, 32));
