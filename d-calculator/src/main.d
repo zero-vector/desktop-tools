@@ -21,44 +21,15 @@ struct Token {
 
 private enum string[] symbols = ["(", ")", "^", "+", "-", "*", "/", "=", "%"];
 
-auto getSymbol(string symbol) {
-    struct SymbolAttr {
-        bool right_associative;
-        bool is_binary;
-        bool is_unary;
-        int precedence;
-    }
-
-    SymbolAttr atr;
-    if (symbol == "*") {
-        atr.is_binary = true;
-        atr.right_associative = true;
-        atr.precedence = 13;
-    }
-    else if (symbol == "/") {
-        atr.is_binary = true;
-        atr.right_associative = true;
-        atr.precedence = 13;
-    }
-    else if (symbol == "+") {
-        atr.is_binary = true;
-        atr.right_associative = true;
-        atr.precedence = 12;
-    }
-    else if (symbol == "-") {
-        atr.is_binary = true;
-        atr.right_associative = true;
-        atr.precedence = 12;
-    }
-
-    // TODO: ^ (pow)
-
-    return atr;
-}
-
 struct Tokenizer {
 
     string text;
+
+    private Token _current;
+
+    @property current() {
+        return _current;
+    }
 
     this(string text) {
         this.text = text; // Is a this copy? (prolly no)
@@ -71,22 +42,46 @@ struct Tokenizer {
         }
     }
 
-    Token peekNextToken() {
-        string tmp = text;
-        auto tok = getNextToken();
-        text = tmp;
-        return tok;
+    bool peekNextToken(Token.Type type, string str = null) {
+
+        //if (current.type == Token.Type.end_of_input) return false;
+        //if (current.type == Token.Type.unknown) return false;
+
+        //writeln("searching for: ", type);
+
+        auto tmpTok = _current;
+        auto tmpTxt = text;
+        next();
+
+        if (current.type == type) {
+
+            if (str is null) return true;
+
+            if (str !is null && current.str == str) {
+                return true;
+            }
+        }
+
+        _current = tmpTok;
+        text = tmpTxt;
+
+        return false;
     }
 
-    Token getNextToken() {
+    void next() {
 
-        if (text.empty) return Token(Token.Type.end_of_input);
+        scope (exit) {
+            //writeln(current);
+        }
+
+        if (text.empty) {
+            _current = Token(Token.Type.end_of_input);
+            return;
+        }
 
         Token token;
 
-        scope(exit) {
-            //writeln(token);
-        }
+
 
         while (text.length) {
 
@@ -142,51 +137,45 @@ struct Tokenizer {
             break;
         }
 
-        return token;
+        _current = token;
+
+        //return token;
     }
 }
 
-Expression parseExpression(ref Tokenizer tokenizer) {
-    writeln("parseExpression");
+Expression parseExpression(ref Tokenizer tok) {
 
-    Expression e = parseTerm(tokenizer);
+    Expression e = parseTerm(tok);
 
-    while(true) {
+    while (true) {
 
-        auto tok = tokenizer.peekNextToken();
-
-        if (tok.type == Token.Type.symbol && (tok.str == "+")) {
-            tokenizer.getNextToken();
-            e = new AddExpression(e, parseExpression(tokenizer));
+        if (tok.peekNextToken(Token.Type.symbol, "+")) {
+            e = new AddExpression(e, parseExpression(tok));
         }
-        else if (tok.type == Token.Type.symbol && (tok.str == "-")) {
-            tokenizer.getNextToken();
-            e = new SubExpression(e, parseExpression(tokenizer));
+        else if (tok.peekNextToken(Token.Type.symbol, "-")) {
+            e = new SubExpression(e, parseExpression(tok));
         }
         else {
+            //tok.next();
             return e;
         }
     }
 }
 
-Expression parseTerm(ref Tokenizer tokenizer) {
-    writeln("parseTerm");
+Expression parseTerm(ref Tokenizer tok) {
 
-    Expression e = parseFactor(tokenizer);
+    Expression e = parseFactor(tok);
 
-    while(true) {
+    while (true) {
 
-        auto tok = tokenizer.peekNextToken();
-
-        if (tok.type == Token.Type.symbol && (tok.str == "*")) {
-            tokenizer.getNextToken();
-            e = new MulExpression(e, parseExpression(tokenizer));
+        if (tok.peekNextToken(Token.Type.symbol, "*")) {
+            e = new MulExpression(e, parseExpression(tok));
         }
-        else if (tok.type == Token.Type.symbol && (tok.str == "/")) {
-            tokenizer.getNextToken();
-            e = new DivExpression(e, parseExpression(tokenizer));
+        else if (tok.peekNextToken(Token.Type.symbol, "/")) {
+            e = new DivExpression(e, parseExpression(tok));
         }
         else {
+            //tok.next();
             return e;
         }
     }
@@ -195,39 +184,33 @@ Expression parseTerm(ref Tokenizer tokenizer) {
 
 }
 
-Expression parseFactor(ref Tokenizer tokenizer) {
-    writeln("parseFactor");
+Expression parseFactor(ref Tokenizer tok) {
 
-    auto tok = tokenizer.peekNextToken();
-
-    if (tok.type == Token.Type.symbol && (tok.str == "+")) {
-        tokenizer.getNextToken();
-        return parseFactor(tokenizer);
+    if (tok.peekNextToken(Token.Type.symbol, "+")) {
+        return parseFactor(tok);
     }
 
-    if (tok.type == Token.Type.symbol && (tok.str == "-")) {
-        tokenizer.getNextToken();
-        return new NegExpression(parseFactor(tokenizer));
+    if (tok.peekNextToken(Token.Type.symbol, "-")) {
+        return new NegExpression(parseFactor(tok));
     }
 
-    if (tok.type == Token.Type.symbol && (tok.str == "(")) {
-        tokenizer.getNextToken();
-        auto e = new ParentheticalExpression(parseExpression(tokenizer));
-        // eat ')'
-        tokenizer.getNextToken();
+    if (tok.peekNextToken(Token.Type.symbol, "(")) {
+        auto e = new ParentheticalExpression(parseExpression(tok));
+
+        if (!tok.peekNextToken(Token.Type.symbol, ")")) {
+            assert(0); // TODO: Format exception.
+        }
 
         return e;
     }
 
-    if (tok.type == Token.Type.int_number) {
-        tokenizer.getNextToken();
-        auto v = to!int(tok.str);
+    if (tok.peekNextToken(Token.Type.int_number)) {
+        auto v = to!int(tok.current.str);
         return new NumberExpression(v);
     }
 
-    if (tok.type == Token.Type.float_number) {
-        tokenizer.getNextToken();
-        auto v = to!double(tok.str);
+    if (tok.peekNextToken(Token.Type.float_number)) {
+        auto v = to!double(tok.current.str);
         return new NumberExpression(v);
     }
 
@@ -236,100 +219,9 @@ Expression parseFactor(ref Tokenizer tokenizer) {
     assert(0);
 }
 
-/+
-Expression parseExpression(ref Tokenizer tokenizer) {
-
-    Expression ret = null;
-
-    while (true) {
-        auto tok = tokenizer.getNextToken();
-
-        if (tok.type == Token.Type.identifier) {
-            writeln("Identifier: ", tok.str);
-        }
-        else if (tok.type == Token.Type.symbol) {
-            writeln("Symbol:    ", tok.str);
-
-            if (tok.str == "(") {
-                auto e = new ParentheticalExpression(parseExpression(tokenizer));
-                ret = e;
-            }
-            else if (tok.str == ")") {
-                break;
-            }
-            else if (tok.str == "+") {
-                auto e = new AddExpression(ret, parseExpression(tokenizer));
-                ret = e;
-                break;
-            }
-            else if (tok.str == "-") {
-
-                if (ret is null) {
-                    auto e = new NegExpression(parseExpression(tokenizer));
-                    ret = e;
-                }
-                else {
-                    auto e = new SubExpression(ret, parseExpression(tokenizer));
-                    ret = e;
-                }
-
-                break;
-            }
-            else if (tok.str == "*") {
-                auto e = new MulExpression(ret, parseExpression(tokenizer));
-                ret = e;
-                break;
-            }
-
-        }
-        else if (tok.type == Token.Type.int_number) {
-            int v = to!int(tok.str);
-            writeln("Integer:    ", v);
-            auto e = new NumberExpression(v);
-            ret = e;
-        }
-        else if (tok.type == Token.Type.float_number) {
-            double v = to!double(tok.str);
-            writeln("Float:      ", v);
-            auto e = new NumberExpression(v);
-            ret = e;
-        }
-        else if (tok.type == Token.Type.end_of_input) {
-            break;
-        }
-        else {
-            // Error/Exception?
-            break;
-
-        }
-    }
-
-    return ret;
-}
-+/
-
 void main() {
 
     writeln("d-calculator");
-
-    version (none) {
-        Expression n0 = new NumberExpression(3);
-        Expression n1 = new NumberExpression(4);
-        Expression n2 = new NegExpression(n1);
-
-        Expression e0 = new MulExpression(n0, n1);
-        Expression e1 = new AddExpression(new NumberExpression(2), e0);
-
-        {
-            auto res = e1.getValue;
-            writeln(res);
-        }
-
-        {
-            auto res = n2.getValue;
-            writeln(res);
-        }
-    }
 
     while (true) {
         string expression = readln();
