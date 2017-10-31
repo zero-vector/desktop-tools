@@ -4,7 +4,7 @@ APP=d-calculator
 CXX=dmd
 #CXX=ldc2
 
-FILES=(`find ./src -name "*.d"`)
+FILES=(`find ./src ../common -name "*.d"`)
 
 rm ./$APP
 

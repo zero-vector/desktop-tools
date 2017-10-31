@@ -2,6 +2,8 @@ import std.stdio;
 import std.string;
 import std.conv;
 
+import arsd.simpledisplay;
+
 import ast;
 
 struct Token {
@@ -42,7 +44,7 @@ struct Tokenizer {
         }
     }
 
-    bool peekNextToken(Token.Type type, string str = null) {
+    bool eatIfEqual(Token.Type type, string str = null) {
 
         //if (current.type == Token.Type.end_of_input) return false;
         //if (current.type == Token.Type.unknown) return false;
@@ -80,8 +82,6 @@ struct Tokenizer {
         }
 
         Token token;
-
-
 
         while (text.length) {
 
@@ -149,10 +149,10 @@ Expression parseExpression(ref Tokenizer tok) {
 
     while (true) {
 
-        if (tok.peekNextToken(Token.Type.symbol, "+")) {
+        if (tok.eatIfEqual(Token.Type.symbol, "+")) {
             e = new AddExpression(e, parseExpression(tok));
         }
-        else if (tok.peekNextToken(Token.Type.symbol, "-")) {
+        else if (tok.eatIfEqual(Token.Type.symbol, "-")) {
             e = new SubExpression(e, parseExpression(tok));
         }
         else {
@@ -168,10 +168,10 @@ Expression parseTerm(ref Tokenizer tok) {
 
     while (true) {
 
-        if (tok.peekNextToken(Token.Type.symbol, "*")) {
+        if (tok.eatIfEqual(Token.Type.symbol, "*")) {
             e = new MulExpression(e, parseExpression(tok));
         }
-        else if (tok.peekNextToken(Token.Type.symbol, "/")) {
+        else if (tok.eatIfEqual(Token.Type.symbol, "/")) {
             e = new DivExpression(e, parseExpression(tok));
         }
         else {
@@ -186,30 +186,30 @@ Expression parseTerm(ref Tokenizer tok) {
 
 Expression parseFactor(ref Tokenizer tok) {
 
-    if (tok.peekNextToken(Token.Type.symbol, "+")) {
+    if (tok.eatIfEqual(Token.Type.symbol, "+")) {
         return parseFactor(tok);
     }
 
-    if (tok.peekNextToken(Token.Type.symbol, "-")) {
+    if (tok.eatIfEqual(Token.Type.symbol, "-")) {
         return new NegExpression(parseFactor(tok));
     }
 
-    if (tok.peekNextToken(Token.Type.symbol, "(")) {
+    if (tok.eatIfEqual(Token.Type.symbol, "(")) {
         auto e = new ParentheticalExpression(parseExpression(tok));
 
-        if (!tok.peekNextToken(Token.Type.symbol, ")")) {
+        if (!tok.eatIfEqual(Token.Type.symbol, ")")) {
             assert(0); // TODO: Format exception.
         }
 
         return e;
     }
 
-    if (tok.peekNextToken(Token.Type.int_number)) {
+    if (tok.eatIfEqual(Token.Type.int_number)) {
         auto v = to!int(tok.current.str);
         return new NumberExpression(v);
     }
 
-    if (tok.peekNextToken(Token.Type.float_number)) {
+    if (tok.eatIfEqual(Token.Type.float_number)) {
         auto v = to!double(tok.current.str);
         return new NumberExpression(v);
     }
@@ -221,8 +221,39 @@ Expression parseFactor(ref Tokenizer tok) {
 
 void main() {
 
-    writeln("d-calculator");
+    //writeln("d-calculator");
 
+    auto window = new SimpleWindow(Size(800, 600), "d-calculator");
+
+    void redraw() {
+        if (window.closed) return;
+
+        auto painter = window.draw();
+        auto glyphSize = painter.textSize("0");
+
+    }
+
+    window.eventLoop(0, delegate(dchar c) {
+
+        redraw(); //redraw_input_only();
+    }, delegate(KeyEvent ev) {
+        if (ev.pressed) {
+            if (ev.key == Key.Escape) {
+                window.close();
+                return;
+            }
+        }
+    }, delegate(MouseEvent ev) {
+        //if (ev.type == MouseEventType.buttonPressed) {
+        //    if (ev.button == MouseButton.wheelUp && yScroll > 0)
+        //        yScroll--;
+        //    if (ev.button == MouseButton.wheelDown && yScroll < lines.length)
+        //        yScroll++;
+        //    redraw();
+        //}
+    });
+
+    /+
     while (true) {
         string expression = readln();
 
@@ -235,7 +266,7 @@ void main() {
         writeln(res);
 
     }
+    +/
 
     writeln("bye");
-
 }
