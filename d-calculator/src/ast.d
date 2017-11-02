@@ -2,8 +2,12 @@ module ast;
 
 import std.stdio;
 
+
+alias FloatType = real;
+alias IntType = long;
+
 class Expression {
-    abstract double getValue();
+    abstract FloatType getValue();
 }
 
 
@@ -14,27 +18,27 @@ class ParentheticalExpression : Expression {
         this._exp = exp;
     }
 
-    override double getValue() {
+    override FloatType getValue() {
         return _exp.getValue();
     }
 
 }
 
 class UnaryExpression : Expression {
-    double delegate(Expression l) operator;
+    FloatType delegate(Expression l) operator;
     Expression _exp;
 
     this(Expression exp) {
         this._exp = exp;
     }
 
-    override double getValue() {
+    override FloatType getValue() {
         return operator(_exp);
     }
 }
 
 abstract class BinaryExpression : Expression {
-    double delegate(Expression l, Expression r) operator;
+    FloatType delegate(Expression l, Expression r) operator;
 
     Expression _left;
     Expression _right;
@@ -44,19 +48,19 @@ abstract class BinaryExpression : Expression {
         this._right = right;
     }
 
-    override double getValue() {
+    override FloatType getValue() {
         return operator(_left, _right);
     }
 }
 
 class NumberExpression : Expression {
-    double _value;
+    FloatType _value;
 
-    this(double v) {
+    this(FloatType v) {
         _value = v;
     }
 
-    override double getValue() {
+    override FloatType getValue() {
         return _value;
     }
 }

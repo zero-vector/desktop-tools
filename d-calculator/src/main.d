@@ -206,18 +206,18 @@ Expression parseFactor(ref Tokenizer tok) {
     }
 
     if (tok.eatIfEqual(Token.Type.int_number)) {
-        auto v = to!int(tok.current.str);
+        auto v = to!long(tok.current.str);
         return new NumberExpression(v);
     }
 
     if (tok.eatIfEqual(Token.Type.float_number)) {
-        auto v = to!double(tok.current.str);
+        auto v = to!real(tok.current.str);
         return new NumberExpression(v);
     }
 
-    // throw Exception
+    throw new Exception("Parser error.");
 
-    assert(0);
+    //assert(0);
 }
 
 pure nothrow Color createColor(ubyte r, ubyte g, ubyte b, ubyte a = 255) {
@@ -247,9 +247,9 @@ void main() {
     auto window = new SimpleWindow(Size(800, 600), "d-calculator");
 
     auto display = XDisplayConnection.get;
-    auto xftFont = XftFontOpenName(display, 0, "Source Code Pro:Bold:pixelsize=18");
+    auto xftFont = XftFontOpenName(display, 0, "Source Code Pro:Normal:pixelsize=18");
     if (xftFont is null) {
-        writeln("fuck");
+        writeln("Well, well, well.");
     }
 
     writeln("XFT Metrics");
@@ -303,10 +303,10 @@ void main() {
             {
                 int y = text_area_height - padding;
                 foreach_reverse (resultLine; lines) {
-                    XftDrawStringUtf8(xftdraw, &xftColor, xftFont, strPos.x, y, resultLine.ptr, cast(int)resultLine.length);
+                    XftDrawStringUtf8(xftdraw, &xftColor, xftFont, strPos.x, y, resultLine.ptr, cast(int) resultLine.length);
                     y -= xftFont.height;
 
-                    if (y < -xftFont.height ) break;
+                    if (y < -xftFont.height) break;
                 }
             }
 
@@ -485,20 +485,26 @@ void main() {
 
                 if (ev.key == Key.Enter || ev.key == Key.PadEnter) {
 
-                    auto expression = cast(string) input_text[0 .. input_text_length];
+                    try {
+                        auto expression = cast(string) input_text[0 .. input_text_length];
 
-                    Tokenizer tokenizer = Tokenizer(expression);
-                    auto e = parseExpression(tokenizer);
-                    auto res = e.getValue;
-                    writeln(res);
+                        Tokenizer tokenizer = Tokenizer(expression);
+                        auto e = parseExpression(tokenizer);
+                        auto res = e.getValue;
+                        writeln(res);
 
-                    char[256] buf;
-                    sformat(buf[], "%s", res);
+                        char[256] buf;
+                        sformat(buf[], "%s", res);
 
-                    string s = buf.idup;
+                        string s = buf.idup;
 
-                    // TODO: Reformat expression from ast.
-                    lines ~= expression.idup ~ " = " ~ buf.idup;
+                        // TODO: Reformat expression from ast.
+                        lines ~= expression.idup;
+                        lines ~= "= " ~ buf.idup;
+                    }
+                    catch (Exception ex) {
+                        lines ~= ex.msg;
+                    }
 
                     carret_pos        = 0;
                     input_text_length = 0;

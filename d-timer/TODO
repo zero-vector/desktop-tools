@@ -1,0 +1,7 @@
+# TODO
+
+[x] Initial count down as argument.
+[x] Message as argument ("PC will suspent in: ...")
+[ ] Pause button/key ([SPACE] to pause?)
+[ ] More info on screen about the command.
+[ ] Notification that the timer is at end.
