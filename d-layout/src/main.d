@@ -13,6 +13,7 @@ import arsd.simpledisplay;
 import arsd.color;
 
 pragma(lib, "X11");
+pragma(lib, "Xmu");
 
 // X11 bindings
 extern (C) nothrow @nogc {
@@ -25,6 +26,8 @@ extern (C) nothrow @nogc {
     enum XC_target    = 128;
 
     Cursor XCreateFontCursor(Display* display, uint shape);
+
+    Window XmuClientWindow(Display *dpy, Window win);
 
 }
 
@@ -121,12 +124,12 @@ bool pickAndResizeWindow(double x, double y, double w, double h) {
         XSync(display, 0);
     }
 
-    XID retwin = None;
+    XID targetWin = None;
     int pressed = 0; // count of number of buttons pressed
     int retbutton = -1; // button used to select window
 
     // TODO: Select with left button, cancel with other.
-    while (retwin == None || pressed != 0) {
+    while (targetWin == None || pressed != 0) {
         XEvent event;
 
         enum SyncPointer = 1;
@@ -136,9 +139,9 @@ bool pickAndResizeWindow(double x, double y, double w, double h) {
         case EventType.ButtonPress:
 
             if (event.xbutton.button != 1) return false;
-            if (retwin == None) {
+            if (targetWin == None) {
                 retbutton = event.xbutton.button;
-                retwin = ((event.xbutton.subwindow != None) ? event.xbutton.subwindow : root);
+                targetWin = ((event.xbutton.subwindow != None) ? event.xbutton.subwindow : root);
             }
             pressed++;
             continue;
@@ -150,8 +153,35 @@ bool pickAndResizeWindow(double x, double y, double w, double h) {
         }
     }
 
-    if (retwin && retwin != root) {
-        sendMoveResizeEvent(retwin, cast(arch_ulong)(screenWidth * x), cast(arch_ulong)(screenHeight * y), cast(arch_ulong)(screenWidth * w), cast(arch_ulong)(screenHeight * h));
+    if (targetWin && targetWin != root) {
+
+        // I have no clue.
+        int dummyi;
+        uint dummy;
+        if (XGetGeometry(display, targetWin, &root, &dummyi, &dummyi, &dummy, &dummy, &dummy, &dummy) && targetWin != root) {
+            targetWin = XmuClientWindow(display, targetWin);
+        }
+
+        writefln("0x%.8x", cast(XID)targetWin);
+
+        auto data =  cast(arch_ulong[]) getX11PropertyData(targetWin, GetAtom!("_NET_FRAME_EXTENTS", true)(display), XA_CARDINAL);
+        writeln("_NET_FRAME_EXTENTS: ", data);
+
+        arch_ulong titleHeight = 0;
+
+        if (data.length == 4) {
+            titleHeight = data[2];
+        }
+
+        writeln("titleHeight: ", titleHeight);
+
+        arch_ulong wx = cast(arch_ulong)(screenWidth * x);
+        arch_ulong wy = cast(arch_ulong)(screenHeight * y);
+
+        arch_ulong ww = cast(arch_ulong)(screenWidth * w);
+        arch_ulong wh = -titleHeight + cast(arch_ulong)(screenHeight * h);
+
+        sendMoveResizeEvent(targetWin, wx, wy, ww, wh);
         XFlush(display);
     }
 
@@ -212,6 +242,8 @@ void main(string[] args) {
 
     // Hack: Normal window & centered.
     //sendMoveResizeEvent(window.impl.window, (screenWidth - winWidth) / 2, (screenHeight - winHeight) / 2, winWidth, winHeight);
+
+    auto display = XDisplayConnection.get();
 
     int selectedOptionIdx = 0;
 
@@ -275,7 +307,6 @@ void main(string[] args) {
                 else if (selectedOptionIdx == 4) {
                     pickAndResizeWindow([[0.0, 0.0, 0.5, 0.5], [0.0, 0.5, 0.5, 0.5], [0.5, 0, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]]);
                 }
-
             }
             else if (ev.key == Key.Down) {
                 selectedOptionIdx = cast(int)((selectedOptionIdx + 1) % layoutOptions.length);
@@ -283,7 +314,6 @@ void main(string[] args) {
             else if (ev.key == Key.Up) {
                 selectedOptionIdx -= 1;
                 if (selectedOptionIdx < 0) selectedOptionIdx = (cast(int) layoutOptions.length) - 1;
-
             }
         }
         // Released
