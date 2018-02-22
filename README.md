@@ -2,6 +2,6 @@
 
 ## d-timer
 
-Execute given command after coundown.
+Execute given command after countdown.
 
 ![ScreenShot](/docs/img/d-timer-scr01.png?raw=true "d-timer")
